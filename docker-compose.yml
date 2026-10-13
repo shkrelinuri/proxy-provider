@@ -1,0 +1,82 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-changeme}
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      - mongo
+      - redis
+    env_file:
+      - ./backend/.env
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - proxy_config:/shared/proxy-config
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+    env_file:
+      - ./frontend/.env
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+  proxy-3proxy:
+    build: ./proxy/3proxy
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3128:3128"   # HTTP/HTTPS
+      - "1080:1080"   # SOCKS5
+    volumes:
+      - proxy_config:/shared/proxy-config
+    environment:
+      BACKEND_INTERNAL_URL: http://backend:4000
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-changeme}
+      CONFIG_REFRESH_SECONDS: 30
+
+  # Alternative HTTP-only proxy engine (use instead of / alongside 3proxy)
+  proxy-squid:
+    build: ./proxy/squid
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3129:3128"
+    volumes:
+      - proxy_config:/shared/proxy-config
+    environment:
+      BACKEND_INTERNAL_URL: http://backend:4000
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-changeme}
+
+volumes:
+  mongo_data:
+  redis_data:
+  proxy_config:

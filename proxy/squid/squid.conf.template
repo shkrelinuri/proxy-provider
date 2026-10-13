@@ -1,0 +1,33 @@
+# Squid config template. BACKEND_INTERNAL_URL / INTERNAL_API_SECRET are baked in
+# by entrypoint.sh via environment variables read directly by the Python helpers.
+
+http_port 3128
+
+# --- Real-time auth callout: validates username/password against the backend
+# on every request via Squid's Basic-auth helper protocol. ---
+auth_param basic program /usr/local/bin/basic_auth_helper.py
+auth_param basic children 10
+auth_param basic realm Proxy Provider
+auth_param basic credentialsttl 2 minutes
+acl authenticated proxy_auth REQUIRED
+
+# --- IP-whitelisted customers (no username/password required) ---
+external_acl_type ip_whitelist_helper ttl=30 negative_ttl=5 children-max=20 %SRC /usr/local/bin/ext_ip_helper.py
+acl whitelisted_src external ip_whitelist_helper
+
+# --- Abuse prevention: block CONNECT/requests to SMTP and other disallowed ports,
+# checked dynamically against the backend's blocked-port list. ---
+external_acl_type dest_port_helper ttl=300 %PORT /usr/local/bin/ext_dest_helper.py
+acl allowed_destination external dest_port_helper
+
+http_access allow authenticated allowed_destination
+http_access allow whitelisted_src allowed_destination
+http_access deny all
+
+# Only allow CONNECT to standard HTTPS port to reduce tunnel abuse surface.
+acl SSL_ports port 443
+acl CONNECT method CONNECT
+http_access deny CONNECT !SSL_ports
+
+access_log /var/log/squid/access.log squid
+cache deny all

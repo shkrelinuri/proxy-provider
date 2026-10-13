@@ -1,0 +1,34 @@
+# 3proxy config template. Placeholders substituted by generate-config.sh:
+#   __USERS__          -> "users" lines for each active userpass credential
+#   __WHITELIST_ACL__  -> "allow" rules for whitelisted source IPs
+#   __DENY_PORTS__     -> "deny" rules blocking abused destination ports (SMTP, etc.)
+
+daemon
+pidfile /usr/local/3proxy/3proxy.pid
+
+nserver 8.8.8.8
+nserver 1.1.1.1
+nscache 65536
+
+timeouts 1 5 30 60 180 1800 15 60
+
+# Structured log format for the log-shipper sidecar to parse and forward to
+# the backend's /internal/usage/report endpoint (connection metadata only).
+log /usr/local/3proxy/logs/3proxy.log D
+logformat "L%C - %U [%t] \"%T\" %E %I %O %N:%P"
+rotate 30
+
+auth strong
+__USERS__
+
+# Abuse prevention: block outbound traffic to SMTP and other known-abused ports
+# for every client, regardless of credential.
+__DENY_PORTS__
+
+# IP-whitelisted customers (no username/password required)
+__WHITELIST_ACL__
+
+allow *
+
+proxy -p3128 -a
+socks -p1080 -a
