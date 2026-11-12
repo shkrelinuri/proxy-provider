@@ -1,8 +1,6 @@
 # Proxy Provider Platform
 
-Datacenter proxy provider with a customer dashboard, admin panel, Stripe billing,
-Redis-metered usage/rate-limiting, and 3proxy/Squid proxy engines with real credential
-and abuse-prevention integration.
+A proxy-service prototype with customer and admin dashboards, Stripe billing, Redis-based usage tracking, and 3proxy/Squid integrations. The proxy engines check credentials and apply the configured abuse-prevention rules.
 
 ## Structure
 
@@ -14,7 +12,7 @@ proxy/squid/   Squid image: real-time external ACL helpers calling the backend p
 docker-compose.yml
 ```
 
-## Running locally
+## Run locally
 
 1. Copy env files and fill in real secrets (Stripe keys, SMTP, JWT secrets):
    ```
@@ -46,5 +44,4 @@ then set `stripePriceId`/`stripeProductId` on each `Plan` via the admin panel. P
 - Both report connection metadata back via `POST /internal/usage/report` for billing/usage charts
   and legally-retained connection logs (`ConnectionLog`, TTL ~13 months).
 
-All `/internal/*` routes require the `x-internal-secret` header (`INTERNAL_API_SECRET`) and should
-never be exposed outside the docker network.
+All `/internal/*` routes require the `x-internal-secret` header (`INTERNAL_API_SECRET`). Keep them on the Docker network; they are not public API routes.
